@@ -27,12 +27,12 @@ class AuraCounterGui:
         self.settings = load_settings()
         self.root = TkinterDnD.Tk() if DND_ENABLED and TkinterDnD is not None else tk.Tk()
         self.root.title(f"{APP_NAME} v{APP_VERSION}")
-        self.root.geometry("1160x820")
-        self.root.minsize(1020, 700)
+        self.root.geometry("1260x820")
+        self.root.minsize(1120, 700)
 
         self.current_result: AggregateResult | None = None
         self.display_rows: list[SummaryRow] = []
-        self.sort_column = "count"
+        self.sort_column = "odds"
         self.sort_descending = True
 
         default_input = self.get_default_vrchat_log_dir()
@@ -192,13 +192,15 @@ class AuraCounterGui:
         ttk.Entry(search_row, textvariable=self.search_var).grid(row=0, column=0, sticky="ew", padx=(0, 8))
         ttk.Button(search_row, text="検索クリア", command=self.clear_search).grid(row=0, column=1)
 
-        self.tree = ttk.Treeview(table_card, columns=("aura", "count", "percentage"), show="headings")
+        self.tree = ttk.Treeview(table_card, columns=("aura", "odds", "count", "percentage"), show="headings")
         self.tree.heading("aura", text="Aura名", command=lambda: self.sort_results("aura"))
+        self.tree.heading("odds", text="確率(1/N)", command=lambda: self.sort_results("odds"))
         self.tree.heading("count", text="件数", command=lambda: self.sort_results("count"))
         self.tree.heading("percentage", text="割合(%)", command=lambda: self.sort_results("percentage"))
-        self.tree.column("aura", width=440, anchor="w")
-        self.tree.column("count", width=100, anchor="e")
-        self.tree.column("percentage", width=120, anchor="e")
+        self.tree.column("aura", width=180, anchor="w")
+        self.tree.column("odds", width=150, anchor="e")
+        self.tree.column("count", width=90, anchor="e")
+        self.tree.column("percentage", width=110, anchor="e")
         self.tree.grid(row=2, column=0, sticky="nsew")
 
         scrollbar = ttk.Scrollbar(table_card, orient="vertical", command=self.tree.yview)
@@ -221,24 +223,32 @@ class AuraCounterGui:
 
         ttk.Label(side_card, text="サマリー", style="CardTitle.TLabel").grid(row=0, column=0, sticky="w")
 
-        stats = [
+        metrics_row = ttk.Frame(side_card, style="Card.TFrame")
+        metrics_row.grid(row=1, column=0, sticky="ew", pady=(14, 0))
+        for index in range(3):
+            metrics_row.columnconfigure(index, weight=1)
+
+        metric_specs = [
             ("対象ファイル数", self.file_count_var),
             ("一致ファイル数", self.matched_file_var),
             ("総検出件数", self.total_count_var),
-            ("保存先", self.save_path_var),
         ]
 
-        for row_index, (label_text, variable) in enumerate(stats, start=1):
-            ttk.Label(side_card, text=label_text, style="Hint.TLabel").grid(row=row_index * 2 - 1, column=0, sticky="w", pady=(12, 0))
-            wrap_len = 280 if label_text == "保存先" else 0
-            ttk.Label(side_card, textvariable=variable, style="Value.TLabel", wraplength=wrap_len).grid(row=row_index * 2, column=0, sticky="w")
+        for column_index, (label_text, variable) in enumerate(metric_specs):
+            metric_card = ttk.Frame(metrics_row, style="Card.TFrame", padding=(0, 0, 8 if column_index < 2 else 0, 0))
+            metric_card.grid(row=0, column=column_index, sticky="ew")
+            ttk.Label(metric_card, text=label_text, style="Hint.TLabel").grid(row=0, column=0, sticky="w")
+            ttk.Label(metric_card, textvariable=variable, style="Value.TLabel").grid(row=1, column=0, sticky="w", pady=(4, 0))
 
-        ttk.Button(side_card, text="保存先フォルダを開く", command=self.open_output_folder).grid(row=10, column=0, sticky="ew", pady=(18, 0))
+        ttk.Label(side_card, text="保存先", style="Hint.TLabel").grid(row=2, column=0, sticky="w", pady=(16, 0))
+        ttk.Label(side_card, textvariable=self.save_path_var, style="Value.TLabel", wraplength=440).grid(row=3, column=0, sticky="w")
 
-        ttk.Label(side_card, text="エラーメッセージ", style="CardTitle.TLabel").grid(row=11, column=0, sticky="w", pady=(18, 0))
+        ttk.Button(side_card, text="保存先フォルダを開く", command=self.open_output_folder).grid(row=4, column=0, sticky="ew", pady=(14, 0))
+
+        ttk.Label(side_card, text="エラーメッセージ", style="CardTitle.TLabel").grid(row=5, column=0, sticky="w", pady=(18, 0))
         self.error_box = tk.Text(
             side_card,
-            height=10,
+            height=7,
             wrap="word",
             bg="#fffdf9",
             fg="#3d4653",
@@ -246,8 +256,8 @@ class AuraCounterGui:
             bd=1,
             font=("Consolas", 9),
         )
-        self.error_box.grid(row=12, column=0, sticky="nsew", pady=(10, 0))
-        side_card.rowconfigure(12, weight=1)
+        self.error_box.grid(row=6, column=0, sticky="nsew", pady=(10, 0))
+        side_card.rowconfigure(6, weight=1)
 
     def _bind_events(self) -> None:
         self.search_var.trace_add("write", lambda *_: self.refresh_tree())
@@ -409,6 +419,9 @@ class AuraCounterGui:
             self.run_button.state(["!disabled"])
             self.progress.stop()
 
+    def _odds_sort_key(self, row: SummaryRow) -> tuple[bool, int, str]:
+        return (row.odds_value is None, row.odds_value or 0, row.aura.lower())
+
     def refresh_tree(self) -> None:
         rows = list(self.display_rows)
         query = self.search_var.get().strip().lower()
@@ -417,6 +430,12 @@ class AuraCounterGui:
 
         if self.sort_column == "aura":
             rows.sort(key=lambda row: row.aura.lower(), reverse=self.sort_descending)
+        elif self.sort_column == "odds":
+            rows.sort(key=self._odds_sort_key)
+            if self.sort_descending:
+                known_rows = [row for row in rows if row.odds_value is not None]
+                unknown_rows = [row for row in rows if row.odds_value is None]
+                rows = list(reversed(known_rows)) + unknown_rows
         elif self.sort_column == "percentage":
             if self.sort_descending:
                 rows.sort(key=lambda row: (-row.percentage, row.aura.lower()))
@@ -432,14 +451,14 @@ class AuraCounterGui:
             self.tree.delete(item_id)
 
         for row in rows:
-            self.tree.insert("", "end", values=(row.aura, row.count, f"{row.percentage:.2f}"))
+            self.tree.insert("", "end", values=(row.aura, row.odds_display, row.count, f"{row.percentage:.2f}"))
 
     def sort_results(self, column: str) -> None:
         if self.sort_column == column:
             self.sort_descending = not self.sort_descending
         else:
             self.sort_column = column
-            self.sort_descending = column != "aura"
+            self.sort_descending = column in {"count", "percentage"}
         self.refresh_tree()
 
     def clear_search(self) -> None:
@@ -482,9 +501,9 @@ class AuraCounterGui:
             messagebox.showinfo("未実行", "コピーできる集計結果がありません。")
             return
 
-        lines = ["Aura\tCount\tPercentage"]
+        lines = ["Aura\tOdds\tCount\tPercentage"]
         for row in self.current_result.summary_rows:
-            lines.append(f"{row.aura}\t{row.count}\t{row.percentage:.2f}")
+            lines.append(f"{row.aura}\t{row.odds_display}\t{row.count}\t{row.percentage:.2f}")
 
         payload = "\n".join(lines)
         self.root.clipboard_clear()
@@ -497,6 +516,3 @@ class AuraCounterGui:
 
 def launch_gui() -> None:
     AuraCounterGui().run()
-
-
-

@@ -4,6 +4,7 @@ from collections import Counter
 
 from .exporter import prepare_output_dir, write_all_outputs
 from .models import AggregateOptions, AggregateResult, CsvOutputPaths, FileAuraRow, SummaryRow
+from .odds import format_odds, load_aura_odds
 from .parser import iter_log_files, parse_log_file
 from .utils import safe_relative_path
 
@@ -12,13 +13,15 @@ class AggregationError(Exception):
     pass
 
 
-def build_summary_rows(aura_counts: Counter[str]) -> list[SummaryRow]:
+def build_summary_rows(aura_counts: Counter[str], aura_odds: dict[str, int]) -> list[SummaryRow]:
     total = sum(aura_counts.values())
     return [
         SummaryRow(
             aura=aura,
             count=count,
             percentage=(count / total * 100.0) if total else 0.0,
+            odds_value=aura_odds.get(aura),
+            odds_display=format_odds(aura_odds.get(aura)),
         )
         for aura, count in sorted(aura_counts.items(), key=lambda item: (-item[1], item[0].lower()))
     ]
@@ -36,6 +39,7 @@ def run_aggregation(options: AggregateOptions) -> AggregateResult:
         raise AggregationError("指定フォルダ配下に .txt / .log ファイルが見つかりません。")
 
     aura_counts: Counter[str] = Counter()
+    aura_odds = load_aura_odds()
     by_file_rows: list[FileAuraRow] = []
     errors: list[str] = []
     matched_files = 0
@@ -63,10 +67,12 @@ def run_aggregation(options: AggregateOptions) -> AggregateResult:
                     file=safe_relative_path(parsed.path, input_dir),
                     aura=aura,
                     count=count,
+                    odds_value=aura_odds.get(aura),
+                    odds_display=format_odds(aura_odds.get(aura)),
                 )
             )
 
-    summary_rows = build_summary_rows(aura_counts)
+    summary_rows = build_summary_rows(aura_counts, aura_odds)
     by_file_rows.sort(key=lambda row: (row.file.lower(), -row.count, row.aura.lower()))
 
     output_dir = prepare_output_dir(output_root)

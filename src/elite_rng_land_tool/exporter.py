@@ -15,25 +15,25 @@ def prepare_output_dir(output_root: Path) -> Path:
 def write_summary_csv(file_path: Path, rows: list[SummaryRow]) -> None:
     with file_path.open("w", encoding="utf-8-sig", newline="") as handle:
         writer = csv.writer(handle)
-        writer.writerow(["Aura", "Count"])
+        writer.writerow(["Aura", "Count", "Odds"])
         for row in rows:
-            writer.writerow([row.aura, row.count])
+            writer.writerow([row.aura, row.count, row.odds_display])
 
 
 def write_detailed_csv(file_path: Path, rows: list[SummaryRow]) -> None:
     with file_path.open("w", encoding="utf-8-sig", newline="") as handle:
         writer = csv.writer(handle)
-        writer.writerow(["Aura", "Count", "Percentage"])
+        writer.writerow(["Aura", "Count", "Percentage", "Odds"])
         for row in rows:
-            writer.writerow([row.aura, row.count, f"{row.percentage:.2f}"])
+            writer.writerow([row.aura, row.count, f"{row.percentage:.2f}", row.odds_display])
 
 
 def write_by_file_csv(file_path: Path, rows: list[FileAuraRow]) -> None:
     with file_path.open("w", encoding="utf-8-sig", newline="") as handle:
         writer = csv.writer(handle)
-        writer.writerow(["File", "Aura", "Count"])
+        writer.writerow(["File", "Aura", "Count", "Odds"])
         for row in rows:
-            writer.writerow([row.file, row.aura, row.count])
+            writer.writerow([row.file, row.aura, row.count, row.odds_display])
 
 
 def write_error_log(file_path: Path, errors: list[str]) -> None:

@@ -20,6 +20,8 @@ class SummaryRow:
     aura: str
     count: int
     percentage: float
+    odds_value: int | None = None
+    odds_display: str = "-"
 
 
 @dataclass(slots=True)
@@ -27,6 +29,8 @@ class FileAuraRow:
     file: str
     aura: str
     count: int
+    odds_value: int | None = None
+    odds_display: str = "-"
 
 
 @dataclass(slots=True)

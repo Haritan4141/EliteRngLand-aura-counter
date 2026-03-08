@@ -55,6 +55,8 @@ Elite's RNG Land/
 - aura ごとの件数集計
 - ファイル別 CSV 出力
 - GUI 上での結果一覧表示
+- `aura_odds.csv` を読み込んで aura ごとの確率(1/N)を表示
+- GUI の初期表示は確率順(1/N が小さい順)
 - フォルダ選択ボタン
 - `自動集計` ボタンで `%USERPROFILE%\AppData\LocalLow\VRChat\VRChat` を即集計
 - `VRChatログを開く` ボタンで `%USERPROFILE%\AppData\LocalLow\VRChat\VRChat` を開く
@@ -79,6 +81,7 @@ Elite's RNG Land/
 ```
 
 - `Firing ○○'s cutscene...` の `○○` を aura 名として抽出します
+- `aura_odds.csv` に一致する aura は確率(1/N)を紐付けて表示します
 - 同一 aura 名は完全一致で集計します
 - 並び順は件数降順を基本にしています
 - 一致しない行は無視します
@@ -203,6 +206,9 @@ dist\EliteRngLandAuraTool.exe
 - GUI は `tkinterdnd2` が入っていると D&D が有効になります
 - PyInstaller ビルド時は `.spec` からアイコンと D&D 依存を取り込みます
 - 保存先を毎回分けるので、過去結果を残しやすい構成です
+- `aura_odds.csv` は exe 化時にも同梱されます
+
+
 
 
 

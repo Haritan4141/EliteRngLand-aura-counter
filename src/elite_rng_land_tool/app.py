@@ -42,7 +42,7 @@ def run_cli(input_dir: Path, output_dir: Path | None, dedupe: bool, no_open: boo
     print(f"Output folder   : {result.output_dir}")
 
     for row in result.summary_rows[:20]:
-        print(f"{row.aura:20} {row.count:>6} ({row.percentage:>6.2f}%)")
+        print(f"{row.aura:20} {row.count:>6} ({row.percentage:>6.2f}%)  {row.odds_display:>15}")
 
     if not no_open:
         try:

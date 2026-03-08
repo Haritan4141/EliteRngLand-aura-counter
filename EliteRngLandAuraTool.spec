@@ -5,13 +5,20 @@ from pathlib import Path
 
 project_root = Path(SPEC).resolve().parent
 icon_path = project_root / "assets" / "app.ico"
+odds_path = project_root / "aura_odds.csv"
+
+datas = []
+if icon_path.exists():
+    datas.append((str(icon_path), "assets"))
+if odds_path.exists():
+    datas.append((str(odds_path), "."))
 
 
 a = Analysis(
     [str(project_root / "main.py")],
     pathex=[str(project_root), str(project_root / "src")],
     binaries=[],
-    datas=[(str(icon_path), "assets")] if icon_path.exists() else [],
+    datas=datas,
     hiddenimports=["tkinterdnd2"],
     hookspath=[],
     hooksconfig={},
@@ -42,4 +49,3 @@ exe = EXE(
     entitlements_file=None,
     icon=str(icon_path) if icon_path.exists() else None,
 )
-
