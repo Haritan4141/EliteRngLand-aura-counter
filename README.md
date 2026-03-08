@@ -56,7 +56,7 @@ Elite's RNG Land/
 - ファイル別 CSV 出力
 - GUI 上での結果一覧表示
 - `aura_odds.csv` を読み込んで aura ごとの確率(1/N)を表示
-- GUI の初期表示は確率順(1/N が小さい順)
+- GUI の初期表示は確率順(1/N の N が大きい順)
 - フォルダ選択ボタン
 - `自動集計` ボタンで `%USERPROFILE%\AppData\LocalLow\VRChat\VRChat` を即集計
 - `VRChatログを開く` ボタンで `%USERPROFILE%\AppData\LocalLow\VRChat\VRChat` を開く
@@ -140,11 +140,11 @@ python main.py --input-dir "%USERPROFILE%\AppData\LocalLow\VRChat\VRChat" --outp
 ## 出力ファイル
 
 - `aura_summary.csv`
-  - `Aura,Count`
+  - `Aura,Count,Odds`
 - `aura_summary_detailed.csv`
-  - `Aura,Count,Percentage`
+  - `Aura,Count,Percentage,Odds`
 - `aura_summary_by_file.csv`
-  - `File,Aura,Count`
+  - `File,Aura,Count,Odds`
 - `aura_errors.log`
   - スキップや読み込み失敗の記録
 
@@ -184,6 +184,45 @@ python -m PyInstaller --noconfirm --clean EliteRngLandAuraTool.spec
 ```text
 dist\EliteRngLandAuraTool.exe
 ```
+
+## GitHub Release 手順
+
+### 1. リリース用コミットを確認
+
+```bat
+git status
+git log --oneline -1
+```
+
+### 2. リリースタグ `v1.0.0` を作成
+
+```bat
+git tag -a v1.0.0 -m "Release v1.0.0"
+```
+
+### 3. GitHub へコミットとタグを push
+
+```bat
+git push origin main
+git push origin v1.0.0
+```
+
+### 4. GitHub Releases を作成
+
+1. GitHub のリポジトリページを開く
+2. `Releases` → `Draft a new release`
+3. Tag に `v1.0.0` を選択
+4. Title を `v1.0.0` にする
+5. 説明欄に更新内容を書く
+6. `dist\EliteRngLandAuraTool.exe` を添付
+7. `Publish release` を押す
+
+### 5. 配布前チェック
+
+1. `dist\EliteRngLandAuraTool.exe` が最新ビルドか確認
+2. `assets\app.ico` が本番アイコンか確認
+3. `aura_odds.csv` が最新内容か確認
+4. 別の Windows 環境で起動確認
 
 ## アイコン差し替え方法
 
