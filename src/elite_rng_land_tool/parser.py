@@ -12,7 +12,7 @@ from .models import ParsedLogFile
 LOG_SUFFIXES = {".txt", ".log"}
 EXCLUDED_DIRECTORY_PREFIXES = ("aura_results_",)
 EXCLUDED_DIRECTORY_NAMES = {".venv", "build", "dist", "__pycache__"}
-AURA_PATTERN = re.compile(r"Firing (?P<aura>.+)'s cutscene\.\.\.")
+AURA_PATTERN = re.compile(r"Firing (?P<aura>.+)'s(?: unique)? cutscene\.\.\.")
 
 
 def iter_log_files(root_dir: Path) -> list[Path]:

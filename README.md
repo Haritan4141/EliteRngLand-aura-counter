@@ -1,6 +1,6 @@
 ﻿# Elite's RNG Land Aura Counter
 
-VRChat ワールド「Elite's RNG Land」のログから、`Firing ○○'s cutscene...` を抽出して aura 出現数を集計する Windows 向けツールです。
+VRChat ワールド「Elite's RNG Land」のログから、`Firing ○○'s cutscene...` と `Firing ○○'s unique cutscene...` を抽出して aura 出現数を集計する Windows 向けツールです。
 
 ## 実装方針
 
@@ -80,7 +80,7 @@ Elite's RNG Land/
 2026.03.08 03:05:51 Debug      -  [<color=#00EEFF>Elite's RNG Land</color>] [<color=grey>LOG</color>] Firing Diamond's cutscene...
 ```
 
-- `Firing ○○'s cutscene...` の `○○` を aura 名として抽出します
+- `Firing ○○'s cutscene...` と `Firing ○○'s unique cutscene...` の `○○` を aura 名として抽出します
 - `aura_odds.csv` に一致する aura は確率(1/N)を紐付けて表示します
 - 同一 aura 名は完全一致で集計します
 - 並び順は件数降順を基本にしています
@@ -227,10 +227,24 @@ git push origin v1.0.0
 ## アイコン差し替え方法
 
 1. `assets\app.ico` を本番用アイコンで置き換える
-2. ファイル名を変えない場合はそのままビルド
-3. ファイル名を変える場合は以下を更新
+2. Windows 用の実 ICO 形式を使う
+3. 推奨は複数サイズ入り
+   - `16x16`
+   - `32x32`
+   - `48x48`
+   - `64x64`
+   - `128x128`
+   - `256x256`
+4. PNG を `.ico` にリネームしただけのファイルは不可
+5. ファイル名を変えない場合はそのままビルド
+6. ファイル名を変える場合は以下を更新
    - `EliteRngLandAuraTool.spec`
    - `src\elite_rng_land_tool\gui.py`
+
+ビルドエラー補足:
+
+- `app.ico` の拡張子でも、中身が PNG だと PyInstaller は失敗します
+- `requirements.txt` に `Pillow` を入れてあるので自動変換の余地はありますが、配布向けには実 ICO を推奨します
 
 ## 配布時の想定
 
@@ -246,6 +260,7 @@ git push origin v1.0.0
 - PyInstaller ビルド時は `.spec` からアイコンと D&D 依存を取り込みます
 - 保存先を毎回分けるので、過去結果を残しやすい構成です
 - `aura_odds.csv` は exe 化時にも同梱されます
+
 
 
 
