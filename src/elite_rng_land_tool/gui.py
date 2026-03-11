@@ -1,15 +1,23 @@
 ﻿from __future__ import annotations
 
-import os
 import threading
 import tkinter as tk
+from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
+from .backup import BackupSyncError, BackupSyncResult, sync_log_backup
 from .models import AggregateOptions, AggregateResult, SummaryRow
 from .service import AggregationError, run_aggregation
 from .settings import UserSettings, load_settings, save_settings
-from .utils import ensure_directory, open_path, resource_path
+from .utils import (
+    ensure_directory,
+    get_default_backup_dir,
+    get_default_output_dir,
+    get_default_vrchat_log_dir,
+    open_path,
+    resource_path,
+)
 from .version import APP_NAME, APP_VERSION
 
 try:
@@ -20,6 +28,9 @@ except ImportError:
     DND_FILES = None
     TkinterDnD = None
     DND_ENABLED = False
+
+
+BACKUP_INTERVAL_MS = 5 * 60 * 1000
 
 
 class AuraCounterGui:
@@ -34,19 +45,28 @@ class AuraCounterGui:
         self.display_rows: list[SummaryRow] = []
         self.sort_column = "odds"
         self.sort_descending = True
+        self.aggregation_in_progress = False
+        self.backup_in_progress = False
 
-        default_input = self.get_default_vrchat_log_dir()
-        default_output = self.get_default_output_dir()
+        default_input = get_default_vrchat_log_dir()
+        default_output = get_default_output_dir()
+        default_backup = get_default_backup_dir()
         try:
             ensure_directory(default_output)
+        except OSError:
+            pass
+        try:
+            ensure_directory(default_backup)
         except OSError:
             pass
 
         self.input_dir_var = tk.StringVar(value=str(default_input))
         self.output_dir_var = tk.StringVar(value=str(default_output))
-        self.search_var = tk.StringVar()
         self.status_var = tk.StringVar(
             value="集計元フォルダと保存先フォルダを自動設定しました。必要なら変更してから集計してください。"
+        )
+        self.backup_status_var = tk.StringVar(
+            value="ログバックアップは起動中に 5 分ごとに自動同期されます。"
         )
         self.save_path_var = tk.StringVar(value="-")
         self.file_count_var = tk.StringVar(value="0")
@@ -58,6 +78,7 @@ class AuraCounterGui:
         self._set_window_icon()
         self._build_ui()
         self._bind_events()
+        self._start_backup_scheduler()
 
     def _configure_style(self) -> None:
         style = ttk.Style(self.root)
@@ -136,11 +157,18 @@ class AuraCounterGui:
         )
         self.auto_run_button.grid(row=0, column=1, sticky="e", padx=(0, 8))
 
+        self.backup_run_button = ttk.Button(
+            options_row,
+            text="バックアップ集計",
+            command=self.start_backup_aggregation,
+        )
+        self.backup_run_button.grid(row=0, column=2, sticky="e", padx=(0, 8))
+
         ttk.Button(
             options_row,
             text="VRChatログを開く",
             command=self.open_default_vrchat_log_dir,
-        ).grid(row=0, column=2, sticky="e", padx=(0, 8))
+        ).grid(row=0, column=3, sticky="e", padx=(0, 8))
 
         self.run_button = ttk.Button(
             options_row,
@@ -148,10 +176,17 @@ class AuraCounterGui:
             style="Primary.TButton",
             command=self.start_aggregation,
         )
-        self.run_button.grid(row=0, column=3, sticky="e")
+        self.run_button.grid(row=0, column=4, sticky="e")
 
-        drop_card = ttk.Frame(outer, style="Card.TFrame", padding=16)
-        drop_card.grid(row=2, column=0, sticky="ew", pady=(0, 14))
+        ttk.Label(
+            control_card,
+            textvariable=self.backup_status_var,
+            style="Hint.TLabel",
+            wraplength=1120,
+        ).grid(row=3, column=0, columnspan=3, sticky="w", pady=(10, 0))
+
+        drop_card = ttk.Frame(outer, style="Card.TFrame", padding=14)
+        drop_card.grid(row=2, column=0, sticky="ew", pady=(8, 12))
         drop_card.columnconfigure(0, weight=1)
 
         ttk.Label(drop_card, text="ドラッグ＆ドロップ", style="CardTitle.TLabel").grid(row=0, column=0, sticky="w")
@@ -164,7 +199,7 @@ class AuraCounterGui:
             relief="ridge",
             bd=2,
             padx=18,
-            pady=20,
+            pady=14,
             font=("Yu Gothic UI Semibold", 11),
         )
         self.drop_zone.grid(row=1, column=0, sticky="ew", pady=(10, 8))
@@ -175,22 +210,16 @@ class AuraCounterGui:
 
         content = ttk.Frame(outer)
         content.grid(row=3, column=0, sticky="nsew")
-        content.columnconfigure(0, weight=5)
-        content.columnconfigure(1, weight=2)
+        content.columnconfigure(0, weight=4)
+        content.columnconfigure(1, weight=3)
         content.rowconfigure(0, weight=1)
 
         table_card = ttk.Frame(content, style="Card.TFrame", padding=16)
         table_card.grid(row=0, column=0, sticky="nsew", padx=(0, 12))
         table_card.columnconfigure(0, weight=1)
-        table_card.rowconfigure(2, weight=1)
+        table_card.rowconfigure(1, weight=1)
 
         ttk.Label(table_card, text="集計結果", style="CardTitle.TLabel").grid(row=0, column=0, sticky="w")
-
-        search_row = ttk.Frame(table_card, style="Card.TFrame")
-        search_row.grid(row=1, column=0, sticky="ew", pady=(10, 10))
-        search_row.columnconfigure(0, weight=1)
-        ttk.Entry(search_row, textvariable=self.search_var).grid(row=0, column=0, sticky="ew", padx=(0, 8))
-        ttk.Button(search_row, text="検索クリア", command=self.clear_search).grid(row=0, column=1)
 
         self.tree = ttk.Treeview(table_card, columns=("aura", "odds", "count", "percentage"), show="headings")
         self.tree.heading("aura", text="Aura名", command=lambda: self.sort_results("aura"))
@@ -201,14 +230,14 @@ class AuraCounterGui:
         self.tree.column("odds", width=150, anchor="e")
         self.tree.column("count", width=90, anchor="e")
         self.tree.column("percentage", width=110, anchor="e")
-        self.tree.grid(row=2, column=0, sticky="nsew")
+        self.tree.grid(row=1, column=0, sticky="nsew", pady=(12, 0))
 
         scrollbar = ttk.Scrollbar(table_card, orient="vertical", command=self.tree.yview)
-        scrollbar.grid(row=2, column=1, sticky="ns")
+        scrollbar.grid(row=1, column=1, sticky="ns", pady=(12, 0))
         self.tree.configure(yscrollcommand=scrollbar.set)
 
         action_row = ttk.Frame(table_card, style="Card.TFrame")
-        action_row.grid(row=3, column=0, sticky="ew", pady=(12, 0))
+        action_row.grid(row=2, column=0, sticky="ew", pady=(12, 0))
         for index in range(4):
             action_row.columnconfigure(index, weight=1)
 
@@ -229,8 +258,8 @@ class AuraCounterGui:
             metrics_row.columnconfigure(index, weight=1)
 
         metric_specs = [
-            ("対象ファイル数", self.file_count_var),
-            ("一致ファイル数", self.matched_file_var),
+            ("対象ログファイル数", self.file_count_var),
+            ("Aura検出ありログファイル数", self.matched_file_var),
             ("総検出件数", self.total_count_var),
         ]
 
@@ -241,14 +270,14 @@ class AuraCounterGui:
             ttk.Label(metric_card, textvariable=variable, style="Value.TLabel").grid(row=1, column=0, sticky="w", pady=(4, 0))
 
         ttk.Label(side_card, text="保存先", style="Hint.TLabel").grid(row=2, column=0, sticky="w", pady=(16, 0))
-        ttk.Label(side_card, textvariable=self.save_path_var, style="Value.TLabel", wraplength=440).grid(row=3, column=0, sticky="w")
+        ttk.Label(side_card, textvariable=self.save_path_var, style="Value.TLabel", wraplength=560).grid(row=3, column=0, sticky="w")
 
-        ttk.Button(side_card, text="保存先フォルダを開く", command=self.open_output_folder).grid(row=4, column=0, sticky="ew", pady=(14, 0))
+        ttk.Button(side_card, text="保存先フォルダを開く", command=self.open_output_folder).grid(row=4, column=0, sticky="ew", pady=(10, 0))
 
-        ttk.Label(side_card, text="エラーメッセージ", style="CardTitle.TLabel").grid(row=5, column=0, sticky="w", pady=(18, 0))
+        ttk.Label(side_card, text="エラーメッセージ", style="CardTitle.TLabel").grid(row=5, column=0, sticky="w", pady=(12, 0))
         self.error_box = tk.Text(
             side_card,
-            height=7,
+            height=5,
             wrap="word",
             bg="#fffdf9",
             fg="#3d4653",
@@ -260,8 +289,6 @@ class AuraCounterGui:
         side_card.rowconfigure(6, weight=1)
 
     def _bind_events(self) -> None:
-        self.search_var.trace_add("write", lambda *_: self.refresh_tree())
-
         if DND_ENABLED and DND_FILES is not None:
             for widget in (self.root, self.drop_zone):
                 widget.drop_target_register(DND_FILES)
@@ -308,20 +335,27 @@ class AuraCounterGui:
         self._start_aggregation_for_dir(input_dir)
 
     def start_auto_aggregation(self) -> None:
-        input_dir = self.get_default_vrchat_log_dir()
+        input_dir = get_default_vrchat_log_dir()
         self.input_dir_var.set(str(input_dir))
         self._start_aggregation_for_dir(input_dir)
 
-    def get_default_vrchat_log_dir(self) -> Path:
-        user_profile = Path(os.environ.get("USERPROFILE", str(Path.home())))
-        return user_profile / "AppData" / "LocalLow" / "VRChat" / "VRChat"
+    def start_backup_aggregation(self) -> None:
+        if self.backup_in_progress:
+            messagebox.showinfo("バックアップ実行中", "ログのバックアップ中です。完了してから再度お試しください。")
+            return
 
-    def get_default_output_dir(self) -> Path:
-        user_profile = Path(os.environ.get("USERPROFILE", str(Path.home())))
-        return user_profile / "Documents" / "Elite's RNG Land" / "exports"
+        input_dir = get_default_backup_dir()
+        try:
+            ensure_directory(input_dir)
+        except OSError as exc:
+            messagebox.showerror("入力エラー", f"バックアップフォルダを作成できませんでした。\n{input_dir}\n\n{exc}")
+            return
+
+        self.input_dir_var.set(str(input_dir))
+        self._start_aggregation_for_dir(input_dir)
 
     def open_default_vrchat_log_dir(self) -> None:
-        log_dir = self.get_default_vrchat_log_dir()
+        log_dir = get_default_vrchat_log_dir()
         if not log_dir.exists() or not log_dir.is_dir():
             messagebox.showerror("起動エラー", f"VRChat ログフォルダが見つかりません。\n{log_dir}")
             return
@@ -333,6 +367,52 @@ class AuraCounterGui:
             open_path(log_dir)
         except OSError as exc:
             messagebox.showerror("起動エラー", f"フォルダを開けませんでした: {exc}")
+
+    def _start_backup_scheduler(self) -> None:
+        self.root.after(1000, self._run_scheduled_backup)
+
+    def _run_scheduled_backup(self) -> None:
+        if not self.aggregation_in_progress and not self.backup_in_progress:
+            self._start_backup_sync()
+        self.root.after(BACKUP_INTERVAL_MS, self._run_scheduled_backup)
+
+    def _start_backup_sync(self) -> None:
+        source_dir = get_default_vrchat_log_dir()
+        backup_dir = get_default_backup_dir()
+
+        self.backup_in_progress = True
+        self.backup_status_var.set(f"ログバックアップを実行中です: {backup_dir}")
+
+        worker = threading.Thread(
+            target=self._run_backup_worker,
+            args=(source_dir, backup_dir),
+            daemon=True,
+        )
+        worker.start()
+
+    def _run_backup_worker(self, source_dir: Path, backup_dir: Path) -> None:
+        try:
+            result = sync_log_backup(source_dir, backup_dir)
+            self.root.after(0, lambda: self._on_backup_success(result))
+        except BackupSyncError as exc:
+            self.root.after(0, lambda: self._on_backup_failure(str(exc)))
+        except Exception as exc:
+            self.root.after(0, lambda: self._on_backup_failure(f"予期しないエラー: {exc}"))
+
+    def _on_backup_success(self, result: BackupSyncResult) -> None:
+        self.backup_in_progress = False
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        status = (
+            f"最終バックアップ: {timestamp} / 対象 {result.scanned_files} 件 / "
+            f"新規・更新 {result.copied_files} 件 / 保存先 {result.backup_dir}"
+        )
+        if result.skipped_files:
+            status += f" / エラー {result.skipped_files} 件"
+        self.backup_status_var.set(status)
+
+    def _on_backup_failure(self, message: str) -> None:
+        self.backup_in_progress = False
+        self.backup_status_var.set(f"ログバックアップエラー: {message}")
 
     def _start_aggregation_for_dir(self, input_dir: Path) -> None:
         output_dir = Path(self.output_dir_var.get().strip() or str(input_dir))
@@ -410,12 +490,15 @@ class AuraCounterGui:
         messagebox.showerror("集計エラー", message)
 
     def _set_busy(self, busy: bool) -> None:
+        self.aggregation_in_progress = busy
         if busy:
             self.auto_run_button.state(["disabled"])
+            self.backup_run_button.state(["disabled"])
             self.run_button.state(["disabled"])
             self.progress.start(10)
         else:
             self.auto_run_button.state(["!disabled"])
+            self.backup_run_button.state(["!disabled"])
             self.run_button.state(["!disabled"])
             self.progress.stop()
 
@@ -424,9 +507,6 @@ class AuraCounterGui:
 
     def refresh_tree(self) -> None:
         rows = list(self.display_rows)
-        query = self.search_var.get().strip().lower()
-        if query:
-            rows = [row for row in rows if query in row.aura.lower()]
 
         if self.sort_column == "aura":
             rows.sort(key=lambda row: row.aura.lower(), reverse=self.sort_descending)
@@ -460,9 +540,6 @@ class AuraCounterGui:
             self.sort_column = column
             self.sort_descending = column in {"count", "percentage"}
         self.refresh_tree()
-
-    def clear_search(self) -> None:
-        self.search_var.set("")
 
     def _render_errors(self, errors: list[str]) -> None:
         self.error_box.delete("1.0", "end")

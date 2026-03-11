@@ -33,6 +33,7 @@ Elite's RNG Land/
 │     ├─ __init__.py
 │     ├─ __main__.py
 │     ├─ app.py
+│     ├─ backup.py
 │     ├─ exporter.py
 │     ├─ gui.py
 │     ├─ models.py
@@ -59,9 +60,12 @@ Elite's RNG Land/
 - GUI の初期表示は確率順(1/N の N が大きい順)
 - フォルダ選択ボタン
 - `自動集計` ボタンで `%USERPROFILE%\AppData\LocalLow\VRChat\VRChat` を即集計
+- 起動中に `%USERPROFILE%\AppData\LocalLow\VRChat\VRChat\VRChatLogsBackup` へ 5 分ごとに自動バックアップ
+- `バックアップ集計` ボタンで `VRChatLogsBackup` をそのまま集計
 - `VRChatログを開く` ボタンで `%USERPROFILE%\AppData\LocalLow\VRChat\VRChat` を開く
 - 起動時に集計元を `%USERPROFILE%\AppData\LocalLow\VRChat\VRChat` へ自動設定
 - 起動時に保存先を `%USERPROFILE%\Documents\Elite's RNG Land\exports` へ自動設定
+- バックアップフォルダが無ければ自動生成
 - 保存先フォルダが無ければ自動生成
 - フォルダのドラッグ＆ドロップ
 - `CSVを開く` ボタンから summary CSV を開く
@@ -69,7 +73,6 @@ Elite's RNG Land/
 - 結果コピー
 - 重複行除外設定の記憶
 - 重複行除外モード
-- aura 名検索
 - ヘッダクリックによるソート切替
 
 ## 集計ルール
@@ -83,7 +86,8 @@ Elite's RNG Land/
 - `Firing ○○'s cutscene...` と `Firing ○○'s unique cutscene...` の `○○` を aura 名として抽出します
 - `aura_odds.csv` に一致する aura は確率(1/N)を紐付けて表示します
 - 同一 aura 名は完全一致で集計します
-- 並び順は件数降順を基本にしています
+- GUI の初期表示は確率順(1/N の N が大きい順)です
+- 通常の VRChat ログ集計では `VRChatLogsBackup` 配下を除外し、二重計上を防ぎます
 - 一致しない行は無視します
 
 ## 文字コードとエラー耐性
@@ -129,13 +133,15 @@ python main.py --input-dir "%USERPROFILE%\AppData\LocalLow\VRChat\VRChat" --outp
 
 1. `run_local.bat` または exe を起動
 2. 起動時に集計元は `%USERPROFILE%\AppData\LocalLow\VRChat\VRChat`、保存先は `%USERPROFILE%\Documents\Elite's RNG Land\exports` に自動設定されます
-3. `自動集計` を押すと標準ログフォルダをそのまま集計できます
-4. `VRChatログを開く` を押すと同じログフォルダを Explorer で開けます
-5. もしくは集計元フォルダをドラッグ＆ドロップ、または `フォルダ選択`
-6. 必要なら保存先フォルダを指定
-7. 手動指定した場合は `集計開始` を押す
-8. GUI の表で結果確認
-9. 必要に応じて `CSVを開く` から `aura_summary.csv` を開く
+3. 起動中は `%USERPROFILE%\AppData\LocalLow\VRChat\VRChat\VRChatLogsBackup` へ 5 分ごとに自動バックアップされます
+4. `自動集計` を押すと標準ログフォルダをそのまま集計できます
+5. `バックアップ集計` を押すとバックアップ済みログだけを集計できます
+6. `VRChatログを開く` を押すと同じログフォルダを Explorer で開けます
+7. もしくは集計元フォルダをドラッグ＆ドロップ、または `フォルダ選択`
+8. 必要なら保存先フォルダを指定
+9. 手動指定した場合は `集計開始` を押す
+10. GUI の表で結果確認
+11. 必要に応じて `CSVを開く` から `aura_summary.csv` を開く
 
 ## 出力ファイル
 
@@ -194,25 +200,25 @@ git status
 git log --oneline -1
 ```
 
-### 2. リリースタグ `v1.1.0` を作成
+### 2. リリースタグ `v1.2.0` を作成
 
 ```bat
-git tag -a v1.1.0 -m "Release v1.1.0"
+git tag -a v1.2.0 -m "Release v1.2.0"
 ```
 
 ### 3. GitHub へコミットとタグを push
 
 ```bat
 git push origin main
-git push origin v1.1.0
+git push origin v1.2.0
 ```
 
 ### 4. GitHub Releases を作成
 
 1. GitHub のリポジトリページを開く
 2. `Releases` → `Draft a new release`
-3. Tag に `v1.1.0` を選択
-4. Title を `v1.1.0` にする
+3. Tag に `v1.2.0` を選択
+4. Title を `v1.2.0` にする
 5. 説明欄に更新内容を書く
 6. `dist\EliteRngLandAuraTool.exe` を添付
 7. `Publish release` を押す
@@ -251,8 +257,8 @@ git push origin v1.1.0
 - 配布対象は `dist\EliteRngLandAuraTool.exe`
 - 初回起動時に設定ファイルを `%APPDATA%\EliteRngLandAuraTool\settings.json` へ保存します
 - Python 非導入の Windows 環境でも exe 単体で実行できます
-- `自動集計` と `VRChatログを開く` は各ユーザーの `%USERPROFILE%` を使うため、ユーザー名に依存しません
-- 起動時の既定保存先 `%USERPROFILE%\Documents\Elite's RNG Land\exports` も各ユーザーごとに自動解決されます
+- `自動集計`、`バックアップ集計`、`VRChatログを開く` は各ユーザーの `%USERPROFILE%` を使うため、ユーザー名に依存しません
+- 起動時の既定保存先 `%USERPROFILE%\Documents\Elite's RNG Land\exports` とバックアップ先 `%USERPROFILE%\AppData\LocalLow\VRChat\VRChat\VRChatLogsBackup` も各ユーザーごとに自動解決されます
 
 ## 補足
 

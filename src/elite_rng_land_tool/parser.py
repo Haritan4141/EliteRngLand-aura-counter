@@ -7,11 +7,12 @@ from collections import Counter
 from pathlib import Path
 
 from .models import ParsedLogFile
+from .utils import VRCHAT_BACKUP_DIR_NAME
 
 
 LOG_SUFFIXES = {".txt", ".log"}
 EXCLUDED_DIRECTORY_PREFIXES = ("aura_results_",)
-EXCLUDED_DIRECTORY_NAMES = {".venv", "build", "dist", "__pycache__"}
+EXCLUDED_DIRECTORY_NAMES = {".venv", "build", "dist", "__pycache__", VRCHAT_BACKUP_DIR_NAME}
 AURA_PATTERN = re.compile(r"Firing (?P<aura>.+)'s(?: unique)? cutscene\.\.\.")
 
 
