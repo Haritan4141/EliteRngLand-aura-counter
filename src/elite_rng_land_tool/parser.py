@@ -7,13 +7,36 @@ from collections import Counter
 from pathlib import Path
 
 from .models import ParsedLogFile
-from .utils import VRCHAT_BACKUP_DIR_NAME
+from .utils import (
+    AURA_ONLY_DIR_NAME,
+    UNKNOWN_PATTERNS_DIR_NAME,
+    UNKNOWN_PATTERNS_LOG_NAME,
+    VRCHAT_BACKUP_DIR_NAME,
+)
 
 
 LOG_SUFFIXES = {".txt", ".log"}
 EXCLUDED_DIRECTORY_PREFIXES = ("aura_results_",)
-EXCLUDED_DIRECTORY_NAMES = {".venv", "build", "dist", "__pycache__", VRCHAT_BACKUP_DIR_NAME}
+EXCLUDED_DIRECTORY_NAMES = {
+    ".venv",
+    "build",
+    "dist",
+    "__pycache__",
+    VRCHAT_BACKUP_DIR_NAME,
+    AURA_ONLY_DIR_NAME,
+    UNKNOWN_PATTERNS_DIR_NAME,
+}
+EXCLUDED_FILE_NAMES = {UNKNOWN_PATTERNS_LOG_NAME}
 AURA_PATTERN = re.compile(r"Firing (?P<aura>.+)'s(?: unique)? cutscene\.\.\.")
+
+
+def extract_aura_name(raw_line: str) -> str | None:
+    match = AURA_PATTERN.search(raw_line)
+    if not match:
+        return None
+
+    aura = match.group("aura").strip()
+    return aura or None
 
 
 def iter_log_files(root_dir: Path) -> list[Path]:
@@ -25,6 +48,8 @@ def iter_log_files(root_dir: Path) -> list[Path]:
             if name not in EXCLUDED_DIRECTORY_NAMES and not name.startswith(EXCLUDED_DIRECTORY_PREFIXES)
         ]
         for file_name in sorted(file_names):
+            if file_name in EXCLUDED_FILE_NAMES:
+                continue
             if Path(file_name).suffix.lower() in LOG_SUFFIXES:
                 results.append(Path(current_root) / file_name)
     return sorted(results)
@@ -74,11 +99,7 @@ def parse_log_file(file_path: Path, *, dedupe_lines: bool = False) -> ParsedLogF
     try:
         with file_path.open("r", encoding=encoding, errors="replace") as handle:
             for raw_line in handle:
-                match = AURA_PATTERN.search(raw_line)
-                if not match:
-                    continue
-
-                aura = match.group("aura").strip()
+                aura = extract_aura_name(raw_line)
                 if not aura:
                     continue
 

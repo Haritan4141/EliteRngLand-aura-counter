@@ -12,6 +12,7 @@ from .service import AggregationError, run_aggregation
 from .settings import UserSettings, load_settings, save_settings
 from .utils import (
     ensure_directory,
+    get_default_aura_backup_dir,
     get_default_backup_dir,
     get_default_output_dir,
     get_default_vrchat_log_dir,
@@ -47,16 +48,22 @@ class AuraCounterGui:
         self.sort_descending = True
         self.aggregation_in_progress = False
         self.backup_in_progress = False
+        self.pending_backup_aggregation = False
 
         default_input = get_default_vrchat_log_dir()
         default_output = get_default_output_dir()
         default_backup = get_default_backup_dir()
+        default_aura_backup = get_default_aura_backup_dir()
         try:
             ensure_directory(default_output)
         except OSError:
             pass
         try:
             ensure_directory(default_backup)
+        except OSError:
+            pass
+        try:
+            ensure_directory(default_aura_backup)
         except OSError:
             pass
 
@@ -66,7 +73,7 @@ class AuraCounterGui:
             value="集計元フォルダと保存先フォルダを自動設定しました。必要なら変更してから集計してください。"
         )
         self.backup_status_var = tk.StringVar(
-            value="ログバックアップは起動中に 5 分ごとに自動同期されます。"
+            value="ログバックアップは起動中に 5 分ごとに同期され、バックアップ集計は aura_only を使用します。"
         )
         self.save_path_var = tk.StringVar(value="-")
         self.file_count_var = tk.StringVar(value="0")
@@ -344,15 +351,16 @@ class AuraCounterGui:
             messagebox.showinfo("バックアップ実行中", "ログのバックアップ中です。完了してから再度お試しください。")
             return
 
-        input_dir = get_default_backup_dir()
+        input_dir = get_default_aura_backup_dir()
         try:
             ensure_directory(input_dir)
         except OSError as exc:
             messagebox.showerror("入力エラー", f"バックアップフォルダを作成できませんでした。\n{input_dir}\n\n{exc}")
             return
 
-        self.input_dir_var.set(str(input_dir))
-        self._start_aggregation_for_dir(input_dir)
+        self.pending_backup_aggregation = True
+        self.status_var.set("バックアップを更新してから aura_only を集計します。")
+        self._start_backup_sync()
 
     def open_default_vrchat_log_dir(self) -> None:
         log_dir = get_default_vrchat_log_dir()
@@ -377,11 +385,14 @@ class AuraCounterGui:
         self.root.after(BACKUP_INTERVAL_MS, self._run_scheduled_backup)
 
     def _start_backup_sync(self) -> None:
+        if self.backup_in_progress:
+            return
+
         source_dir = get_default_vrchat_log_dir()
         backup_dir = get_default_backup_dir()
 
         self.backup_in_progress = True
-        self.backup_status_var.set(f"ログバックアップを実行中です: {backup_dir}")
+        self.backup_status_var.set("ログバックアップを実行中です。")
 
         worker = threading.Thread(
             target=self._run_backup_worker,
@@ -404,15 +415,28 @@ class AuraCounterGui:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         status = (
             f"最終バックアップ: {timestamp} / 対象 {result.scanned_files} 件 / "
-            f"新規・更新 {result.copied_files} 件 / 保存先 {result.backup_dir}"
+            f"raw更新 {result.copied_files} 件 / aura_only更新 {result.aura_only_updated_files} 件 / "
+            f"未対応候補 {result.unknown_pattern_lines} 行"
         )
+        if result.aura_only_removed_files:
+            status += f" / aura_only削除 {result.aura_only_removed_files} 件"
+        if result.unknown_removed_files:
+            status += f" / 未対応候補削除 {result.unknown_removed_files} 件"
         if result.skipped_files:
             status += f" / エラー {result.skipped_files} 件"
         self.backup_status_var.set(status)
 
+        if self.pending_backup_aggregation:
+            self.pending_backup_aggregation = False
+            self.input_dir_var.set(str(result.aura_only_dir))
+            self._start_aggregation_for_dir(result.aura_only_dir)
+
     def _on_backup_failure(self, message: str) -> None:
         self.backup_in_progress = False
         self.backup_status_var.set(f"ログバックアップエラー: {message}")
+        if self.pending_backup_aggregation:
+            self.pending_backup_aggregation = False
+            messagebox.showerror("バックアップエラー", message)
 
     def _start_aggregation_for_dir(self, input_dir: Path) -> None:
         output_dir = Path(self.output_dir_var.get().strip() or str(input_dir))

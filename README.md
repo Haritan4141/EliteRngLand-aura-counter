@@ -61,7 +61,9 @@ Elite's RNG Land/
 - フォルダ選択ボタン
 - `自動集計` ボタンで `%USERPROFILE%\AppData\LocalLow\VRChat\VRChat` を即集計
 - 起動中に `%USERPROFILE%\AppData\LocalLow\VRChat\VRChat\VRChatLogsBackup` へ 5 分ごとに自動バックアップ
-- `バックアップ集計` ボタンで `VRChatLogsBackup` をそのまま集計
+- バックアップ更新時に `%USERPROFILE%\AppData\LocalLow\VRChat\VRChat\VRChatLogsBackup\aura_only` を同時生成
+- バックアップ更新時に未対応候補を `%USERPROFILE%\AppData\LocalLow\VRChat\VRChat\VRChatLogsBackup\unknown_aura_patterns.log` へ保存
+- `バックアップ集計` ボタンで `VRChatLogsBackup\aura_only` を集計
 - `VRChatログを開く` ボタンで `%USERPROFILE%\AppData\LocalLow\VRChat\VRChat` を開く
 - 起動時に集計元を `%USERPROFILE%\AppData\LocalLow\VRChat\VRChat` へ自動設定
 - 起動時に保存先を `%USERPROFILE%\Documents\Elite's RNG Land\exports` へ自動設定
@@ -88,6 +90,8 @@ Elite's RNG Land/
 - 同一 aura 名は完全一致で集計します
 - GUI の初期表示は確率順(1/N の N が大きい順)です
 - 通常の VRChat ログ集計では `VRChatLogsBackup` 配下を除外し、二重計上を防ぎます
+- `aura_only` には aura 関連行だけを保持するため、バックアップ集計を軽量化できます
+- `unknown_aura_patterns.log` には、現行パターンでは抽出できないが `Elite's RNG Land` または `cutscene` を含む行を記録します
 - 一致しない行は無視します
 
 ## 文字コードとエラー耐性
@@ -133,9 +137,9 @@ python main.py --input-dir "%USERPROFILE%\AppData\LocalLow\VRChat\VRChat" --outp
 
 1. `run_local.bat` または exe を起動
 2. 起動時に集計元は `%USERPROFILE%\AppData\LocalLow\VRChat\VRChat`、保存先は `%USERPROFILE%\Documents\Elite's RNG Land\exports` に自動設定されます
-3. 起動中は `%USERPROFILE%\AppData\LocalLow\VRChat\VRChat\VRChatLogsBackup` へ 5 分ごとに自動バックアップされます
+3. 起動中は `%USERPROFILE%\AppData\LocalLow\VRChat\VRChat\VRChatLogsBackup` へ 5 分ごとに自動バックアップされ、同時に `aura_only` と `unknown_aura_patterns.log` も更新されます
 4. `自動集計` を押すと標準ログフォルダをそのまま集計できます
-5. `バックアップ集計` を押すとバックアップ済みログだけを集計できます
+5. `バックアップ集計` を押すと最新化した `aura_only` を集計できます
 6. `VRChatログを開く` を押すと同じログフォルダを Explorer で開けます
 7. もしくは集計元フォルダをドラッグ＆ドロップ、または `フォルダ選択`
 8. 必要なら保存先フォルダを指定
@@ -200,25 +204,25 @@ git status
 git log --oneline -1
 ```
 
-### 2. リリースタグ `v1.2.0` を作成
+### 2. リリースタグ `v1.3.0` を作成
 
 ```bat
-git tag -a v1.2.0 -m "Release v1.2.0"
+git tag -a v1.3.0 -m "Release v1.3.0"
 ```
 
 ### 3. GitHub へコミットとタグを push
 
 ```bat
 git push origin main
-git push origin v1.2.0
+git push origin v1.3.0
 ```
 
 ### 4. GitHub Releases を作成
 
 1. GitHub のリポジトリページを開く
 2. `Releases` → `Draft a new release`
-3. Tag に `v1.2.0` を選択
-4. Title を `v1.2.0` にする
+3. Tag に `v1.3.0` を選択
+4. Title を `v1.3.0` にする
 5. 説明欄に更新内容を書く
 6. `dist\EliteRngLandAuraTool.exe` を添付
 7. `Publish release` を押す
@@ -258,7 +262,7 @@ git push origin v1.2.0
 - 初回起動時に設定ファイルを `%APPDATA%\EliteRngLandAuraTool\settings.json` へ保存します
 - Python 非導入の Windows 環境でも exe 単体で実行できます
 - `自動集計`、`バックアップ集計`、`VRChatログを開く` は各ユーザーの `%USERPROFILE%` を使うため、ユーザー名に依存しません
-- 起動時の既定保存先 `%USERPROFILE%\Documents\Elite's RNG Land\exports` とバックアップ先 `%USERPROFILE%\AppData\LocalLow\VRChat\VRChat\VRChatLogsBackup` も各ユーザーごとに自動解決されます
+- 起動時の既定保存先 `%USERPROFILE%\Documents\Elite's RNG Land\exports` とバックアップ先 `%USERPROFILE%\AppData\LocalLow\VRChat\VRChat\VRChatLogsBackup`、`aura_only`、`unknown_aura_patterns.log` も各ユーザーごとに自動解決されます
 
 ## 補足
 

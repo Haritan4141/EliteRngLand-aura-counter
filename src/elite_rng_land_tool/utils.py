@@ -8,6 +8,9 @@ from pathlib import Path
 
 
 VRCHAT_BACKUP_DIR_NAME = "VRChatLogsBackup"
+AURA_ONLY_DIR_NAME = "aura_only"
+UNKNOWN_PATTERNS_DIR_NAME = "_unknown_patterns"
+UNKNOWN_PATTERNS_LOG_NAME = "unknown_aura_patterns.log"
 
 
 def resource_path(relative_path: str) -> Path:
@@ -38,6 +41,14 @@ def get_default_output_dir() -> Path:
 
 def get_default_backup_dir() -> Path:
     return get_default_vrchat_log_dir() / VRCHAT_BACKUP_DIR_NAME
+
+
+def get_default_aura_backup_dir() -> Path:
+    return get_default_backup_dir() / AURA_ONLY_DIR_NAME
+
+
+def get_default_unknown_patterns_log_path() -> Path:
+    return get_default_backup_dir() / UNKNOWN_PATTERNS_LOG_NAME
 
 
 def safe_relative_path(path: Path, root: Path) -> str:
