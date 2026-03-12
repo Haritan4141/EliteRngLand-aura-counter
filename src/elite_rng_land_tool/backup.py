@@ -174,7 +174,7 @@ def sync_log_backup(source_dir: Path, backup_dir: Path) -> BackupSyncResult:
                     unknown_removed_files += 1
 
                 unknown_needs_rebuild = True
-        except OSError as exc:
+        except (OSError, UnicodeError) as exc:
             skipped_files += 1
             errors.append(f"{source_path}: {exc}")
 

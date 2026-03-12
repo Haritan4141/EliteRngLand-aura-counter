@@ -63,6 +63,17 @@ def _looks_like_utf16(sample: bytes) -> bool:
     return sample.count(b"\x00") / len(sample) > 0.2
 
 
+def _utf16_candidates(sample: bytes) -> tuple[str, ...]:
+    if sample.startswith((codecs.BOM_UTF16_BE, codecs.BOM_UTF16_LE)):
+        return ("utf-16", "utf-16-le", "utf-16-be")
+
+    even_nulls = sample[0::2].count(b"\x00")
+    odd_nulls = sample[1::2].count(b"\x00")
+    if odd_nulls >= even_nulls:
+        return ("utf-16-le", "utf-16-be")
+    return ("utf-16-be", "utf-16-le")
+
+
 def detect_encoding(file_path: Path) -> str:
     with file_path.open("rb") as handle:
         sample = handle.read(4096)
@@ -70,18 +81,18 @@ def detect_encoding(file_path: Path) -> str:
     if sample.startswith(codecs.BOM_UTF8):
         return "utf-8-sig"
     if _looks_like_utf16(sample):
-        for encoding in ("utf-16", "utf-16-le", "utf-16-be"):
+        for encoding in _utf16_candidates(sample):
             try:
                 sample.decode(encoding)
                 return encoding
-            except UnicodeDecodeError:
+            except UnicodeError:
                 continue
 
     for encoding in ("utf-8-sig", "utf-8", "cp932"):
         try:
             sample.decode(encoding)
             return encoding
-        except UnicodeDecodeError:
+        except UnicodeError:
             continue
 
     return "latin-1"
@@ -90,7 +101,7 @@ def detect_encoding(file_path: Path) -> str:
 def parse_log_file(file_path: Path, *, dedupe_lines: bool = False) -> ParsedLogFile:
     try:
         encoding = detect_encoding(file_path)
-    except OSError as exc:
+    except (OSError, UnicodeError) as exc:
         return ParsedLogFile(path=file_path, encoding="unknown", error=str(exc))
 
     counts: Counter[str] = Counter()
@@ -110,7 +121,7 @@ def parse_log_file(file_path: Path, *, dedupe_lines: bool = False) -> ParsedLogF
                     seen_matches.add(line_key)
 
                 counts[aura] += 1
-    except OSError as exc:
+    except (OSError, UnicodeError) as exc:
         return ParsedLogFile(path=file_path, encoding=encoding, error=str(exc))
 
     return ParsedLogFile(

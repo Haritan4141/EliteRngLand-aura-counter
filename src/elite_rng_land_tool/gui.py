@@ -404,11 +404,11 @@ class AuraCounterGui:
     def _run_backup_worker(self, source_dir: Path, backup_dir: Path) -> None:
         try:
             result = sync_log_backup(source_dir, backup_dir)
-            self.root.after(0, lambda: self._on_backup_success(result))
+            self.root.after(0, self._on_backup_success, result)
         except BackupSyncError as exc:
-            self.root.after(0, lambda: self._on_backup_failure(str(exc)))
+            self.root.after(0, self._on_backup_failure, str(exc))
         except Exception as exc:
-            self.root.after(0, lambda: self._on_backup_failure(f"予期しないエラー: {exc}"))
+            self.root.after(0, self._on_backup_failure, f"予期しないエラー: {exc}")
 
     def _on_backup_success(self, result: BackupSyncResult) -> None:
         self.backup_in_progress = False
@@ -480,11 +480,11 @@ class AuraCounterGui:
                     auto_open_summary=False,
                 )
             )
-            self.root.after(0, lambda: self._on_success(result))
+            self.root.after(0, self._on_success, result)
         except AggregationError as exc:
-            self.root.after(0, lambda: self._on_failure(str(exc)))
+            self.root.after(0, self._on_failure, str(exc))
         except Exception as exc:
-            self.root.after(0, lambda: self._on_failure(f"予期しないエラー: {exc}"))
+            self.root.after(0, self._on_failure, f"予期しないエラー: {exc}")
 
     def _on_success(self, result: AggregateResult) -> None:
         self._set_busy(False)

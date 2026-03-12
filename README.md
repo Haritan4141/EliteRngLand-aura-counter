@@ -204,25 +204,25 @@ git status
 git log --oneline -1
 ```
 
-### 2. リリースタグ `v1.3.0` を作成
+### 2. リリースタグ `v1.3.1` を作成
 
 ```bat
-git tag -a v1.3.0 -m "Release v1.3.0"
+git tag -a v1.3.1 -m "Release v1.3.1"
 ```
 
 ### 3. GitHub へコミットとタグを push
 
 ```bat
 git push origin main
-git push origin v1.3.0
+git push origin v1.3.1
 ```
 
 ### 4. GitHub Releases を作成
 
 1. GitHub のリポジトリページを開く
 2. `Releases` → `Draft a new release`
-3. Tag に `v1.3.0` を選択
-4. Title を `v1.3.0` にする
+3. Tag に `v1.3.1` を選択
+4. Title を `v1.3.1` にする
 5. 説明欄に更新内容を書く
 6. `dist\EliteRngLandAuraTool.exe` を添付
 7. `Publish release` を押す
